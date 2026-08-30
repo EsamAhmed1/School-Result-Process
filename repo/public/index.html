@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Result Engine</title>
+<meta name="description" content="P08 School Result Processing and GPA Engine — LSH26-T013, Byte Bandits.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/engine.css">
+</head>
+<body>
+<main class="login">
+
+  <section class="login-form-side">
+    <div class="login-box">
+
+      <div class="brand">
+        <div class="brand-mark">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3 2 8l10 5 10-5-10-5Z" fill="#4C0585"/>
+            <path d="M6 11v4.5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V11" stroke="#4C0585" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M21 8.5v5" stroke="#DBB5EE" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">Result Engine</div>
+          <div class="brand-sub">Byte Bandits</div>
+        </div>
+      </div>
+
+      <h1>Sign in</h1>
+      <p class="lede">Results for the half yearly 2026 exam are published. Use your school ID to open them.</p>
+
+      <div class="role-switch" id="roles">
+        <span class="on" data-role="student">Student</span>
+        <span data-role="teacher">Teacher</span>
+        <span data-role="ops">Office</span>
+      </div>
+
+      <div class="login-err" id="err" hidden></div>
+
+      <div class="field">
+        <label for="uid">School ID</label>
+        <div class="box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A6690" stroke-width="1.8">
+            <circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0" stroke-linecap="round"/>
+          </svg>
+          <input id="uid" type="text" placeholder="student.s001" autocomplete="username">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="pw">Password</label>
+        <div class="box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A6690" stroke-width="1.8">
+            <rect x="4" y="10" width="16" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+          </svg>
+          <input id="pw" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">
+          <button type="button" id="peek" aria-label="Show password">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A6690" stroke-width="1.8">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="login-row">
+        <label class="check"><input type="checkbox" id="keep"> Keep me signed in</label>
+        <a href="#" id="forgot">Forgot password</a>
+      </div>
+
+      <button class="btn btn-purple btn-block" id="signin">Sign in</button>
+
+      <div class="demo-accounts">
+        <p>Demo accounts for judging — tap one to fill the form</p>
+        <div id="demo"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="login-art-side">
+    <div class="login-art">
+      <h2>Every grade,<br>with its reason.</h2>
+      <p>Open a result and see the mark that was used, the point it produced, and the rule that decided it.</p>
+
+      <svg viewBox="0 0 460 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Students reviewing a marksheet with a magnifier">
+        <ellipse cx="230" cy="268" rx="180" ry="18" fill="#3C066C" opacity=".35"/>
+
+        <!-- back papers -->
+        <rect x="150" y="66" width="150" height="182" rx="10" fill="#C79CE4" transform="rotate(-7 225 157)"/>
+        <rect x="162" y="58" width="150" height="182" rx="10" fill="#E7D2F6" transform="rotate(4 237 149)"/>
+
+        <!-- main marksheet -->
+        <rect x="158" y="52" width="152" height="186" rx="12" fill="#FFFDFE"/>
+        <rect x="176" y="72" width="66" height="9" rx="4.5" fill="#4C0585"/>
+        <rect x="176" y="92" width="112" height="6" rx="3" fill="#DBB5EE"/>
+        <rect x="176" y="106" width="96" height="6" rx="3" fill="#DBB5EE"/>
+        <rect x="176" y="126" width="112" height="6" rx="3" fill="#E7D2F6"/>
+        <rect x="176" y="140" width="80" height="6" rx="3" fill="#E7D2F6"/>
+        <rect x="176" y="160" width="112" height="6" rx="3" fill="#E7D2F6"/>
+        <rect x="176" y="174" width="70" height="6" rx="3" fill="#E7D2F6"/>
+        <rect x="176" y="196" width="52" height="20" rx="6" fill="#FEE7ED"/>
+        <text x="184" y="210" font-family="JetBrains Mono, monospace" font-size="11" fill="#C31842">R-11</text>
+        <rect x="236" y="196" width="52" height="20" rx="6" fill="#E1F7EE"/>
+        <text x="245" y="210" font-family="JetBrains Mono, monospace" font-size="11" fill="#127A55">5.00</text>
+
+        <!-- magnifier -->
+        <circle cx="268" cy="150" r="54" fill="#FFFDFE" fill-opacity=".18" stroke="#FFFDFE" stroke-width="7"/>
+        <rect x="300" y="186" width="18" height="58" rx="9" fill="#FFFDFE" transform="rotate(-42 309 215)"/>
+
+        <!-- student left -->
+        <circle cx="88" cy="150" r="17" fill="#FFFDFE"/>
+        <path d="M74 143c0-9 6-14 14-14s14 5 14 14c-5-4-9-5-14-5s-9 1-14 5Z" fill="#3C066C"/>
+        <path d="M70 246v-52c0-11 8-19 18-19s18 8 18 19v52" fill="#DBB5EE"/>
+        <rect x="70" y="246" width="14" height="22" rx="6" fill="#FFFDFE"/>
+        <rect x="92" y="246" width="14" height="22" rx="6" fill="#FFFDFE"/>
+        <rect x="98" y="186" width="30" height="22" rx="5" fill="#FFFDFE"/>
+        <rect x="103" y="192" width="20" height="10" rx="2" fill="#7B2FF7"/>
+
+        <!-- student right, seated on the stack -->
+        <circle cx="378" cy="146" r="16" fill="#FFFDFE"/>
+        <path d="M366 140c2-8 8-11 12-11s10 3 12 11c-4-3-8-4-12-4s-8 1-12 4Z" fill="#3C066C"/>
+        <circle cx="392" cy="130" r="7" fill="#3C066C"/>
+        <path d="M356 228v-42c0-12 10-21 22-21s22 9 22 21v42" fill="#DBB5EE"/>
+        <rect x="342" y="212" width="72" height="16" rx="8" fill="#FFFDFE"/>
+        <rect x="336" y="228" width="88" height="40" rx="10" fill="#C79CE4"/>
+
+        <!-- floating marks -->
+        <rect x="60" y="72" width="46" height="24" rx="8" fill="#FFFDFE"/>
+        <text x="70" y="89" font-family="JetBrains Mono, monospace" font-size="12" fill="#4C0585">62/75</text>
+        <rect x="366" y="66" width="46" height="24" rx="8" fill="#FFFDFE" fill-opacity=".9"/>
+        <text x="376" y="83" font-family="JetBrains Mono, monospace" font-size="12" fill="#4C0585">19/25</text>
+        <circle cx="126" cy="48" r="7" fill="#DBB5EE"/>
+        <circle cx="342" cy="42" r="5" fill="#FFFDFE"/>
+        <circle cx="46" cy="188" r="6" fill="#C79CE4"/>
+      </svg>
+
+      <div class="art-stats">
+        <div class="art-stat"><b>62</b><span>Students</span></div>
+        <div class="art-stat"><b>2</b><span>Classes</span></div>
+        <div class="art-stat"><b>7</b><span>Subjects</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const DEMO = {
+    student: [
+      { u: 'student.s001', p: 'stud1234', l: 'Nusrat Jahan Mim · S001, failed one subject' },
+      { u: 'student.s008', p: 'stud1234', l: 'Arif Mahmud · S008, GPA 5.00' },
+      { u: 'guardian.s001', p: 'guard1234', l: 'Guardian of S001 and S007' },
+    ],
+    teacher: [
+      { u: 'teacher.shirin', p: 'teach1234', l: 'Shirin Akter · physics, chemistry' },
+      { u: 'teacher.mahbub', p: 'teach1234', l: 'Mahbub Alam · ICT, statistics' },
+    ],
+    ops: [
+      { u: 'ops.admin', p: 'ops1234', l: 'Exam office · all four required items' },
+      { u: 'exec.head', p: 'exec1234', l: 'School authority · read-only' },
+    ],
+  };
+
+  let role = 'student';
+  const $ = function (id) { return document.getElementById(id); };
+
+  function drawDemo() {
+    $('demo').innerHTML = DEMO[role].map(function (d) {
+      return '<button class="demo-btn" data-u="' + d.u + '" data-p="' + d.p + '">'
+        + '<b>' + d.u + '</b><span>' + esc(d.l) + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('.demo-btn'), function (b) {
+      b.addEventListener('click', function () {
+        $('uid').value = b.dataset.u;
+        $('pw').value = b.dataset.p;
+        $('err').hidden = true;
+        $('signin').focus();
+      });
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#roles span'), function (s) {
+    s.addEventListener('click', function () {
+      role = s.dataset.role;
+      document.querySelectorAll('#roles span').forEach(function (x) {
+        x.classList.toggle('on', x === s);
+      });
+      $('uid').value = ''; $('pw').value = ''; $('err').hidden = true;
+      drawDemo();
+    });
+  });
+
+  $('peek').addEventListener('click', function () {
+    $('pw').type = $('pw').type === 'password' ? 'text' : 'password';
+  });
+
+  $('forgot').addEventListener('click', function (e) {
+    e.preventDefault();
+    showErr('Password resets are handled by the exam office. Use a demo account below.');
+  });
+
+  function showErr(m) { $('err').textContent = m; $('err').hidden = false; }
+
+  async function submit() {
+    const username = $('uid').value.trim();
+    const password = $('pw').value;
+    if (!username) return showErr('Enter your school ID.');
+    if (!password) return showErr('Enter your password.');
+
+    $('signin').disabled = true;
+    $('signin').textContent = 'Signing in\u2026';
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Sign in failed.');
+      sessionStorage.setItem('p08.token', data.token);
+      sessionStorage.setItem('p08.user', JSON.stringify(data.user));
+      window.location.href = data.user.home;
+    } catch (err) {
+      $('signin').disabled = false;
+      $('signin').textContent = 'Sign in';
+      showErr(err.message);
+    }
+    return undefined;
+  }
+
+  $('signin').addEventListener('click', submit);
+  ['uid', 'pw'].forEach(function (id) {
+    $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  });
+
+  sessionStorage.removeItem('p08.token');
+  drawDemo();
+}());
+</script>
+</body>
+</html>

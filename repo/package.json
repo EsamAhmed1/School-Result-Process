@@ -1,0 +1,11 @@
+{
+  "name": "lsh26-t013-p08",
+  "version": "1.0.0",
+  "description": "School Result Processing and GPA Engine — LSH26 P08",
+  "private": true,
+  "scripts": {
+    "test": "node test/engine.test.js",
+    "dev": "node dev-server.js"
+  },
+  "engines": { "node": ">=18" }
+}

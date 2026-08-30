@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Result Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/engine.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar"></div>
+    <div id="view"><div class="card"><div class="empty">Loading\u2026</div></div></div>
+  </main>
+</div>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const user = requireSession(['ops', 'executive']);
+  if (!user) return;
+  const view = document.getElementById('view');
+
+  api('/api/summary').then(function (s) {
+    renderSidebar('dashboard.html',
+      'Processed ' + s.students + ' of ' + s.students + ' students \u00b7 calculated live');
+    renderTopbar();
+
+    const flagged = s.lists.optional + s.lists.practical + s.lists.absent;
+    const stat = function (cls, ic, icColour, tag, num, note) {
+      return '<div class="stat ' + cls + '"><div class="puck">'
+        + svg(ic, { stroke: icColour, size: 17, w: 2 }) + '</div>'
+        + '<div class="tag">' + tag + '</div><div class="num">' + num + '</div>'
+        + '<div class="note">' + note + '</div></div>';
+    };
+
+    const order = ['A+', 'A', 'A-', 'B', 'C', 'D', 'F'];
+    const top = Math.max.apply(null, order.map(function (l) { return s.distribution[l] || 0; })) || 1;
+    const dist = order.map(function (l) {
+      const n = s.distribution[l] || 0;
+      const isF = l === 'F';
+      return '<div class="dist-row"><span class="lg"' + (isF ? ' style="color:var(--fail)"' : '')
+        + '>' + (l === 'A-' ? 'A\u2212' : l) + '</span>'
+        + '<span class="bar' + (isF ? ' is-fail' : '') + '"><i style="width:'
+        + Math.round((n / top) * 100) + '%"></i></span>'
+        + '<span class="n">' + n + '</span></div>';
+    }).join('');
+
+    view.innerHTML =
+      '<section class="hero"><div class="hero-copy">'
+      + '<div class="eyebrow">Half yearly examination \u00b7 2026</div>'
+      + '<h1>Results are ready to check, ' + esc(user.name.split(' ')[0]) + '.</h1>'
+      + '<p>All ' + s.students + ' students have been graded against the published rules. '
+      + flagged + ' results were changed by the optional subject rule, a practical fail or an '
+      + 'absent mark \u2014 those need a teacher\u2019s eye before publishing.</p>'
+      + '<div class="hero-actions"><a class="btn btn-solid" href="lists.html">Open checking lists</a>'
+      + '<a class="btn btn-ghost" href="student.html">View a student result</a></div></div>'
+      + `<div class="hero-art">
+        <svg viewBox="0 0 250 190" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <ellipse cx="128" cy="172" rx="86" ry="12" fill="#380563" opacity=".45"/>
+          <!-- scroll -->
+          <rect x="26" y="72" width="76" height="94" rx="10" fill="#FFFDFE" transform="rotate(-8 64 119)"/>
+          <rect x="38" y="92" width="42" height="6" rx="3" fill="#DBB5EE" transform="rotate(-8 59 95)"/>
+          <rect x="36" y="108" width="52" height="6" rx="3" fill="#E7D2F6" transform="rotate(-8 62 111)"/>
+          <rect x="34" y="124" width="34" height="6" rx="3" fill="#E7D2F6" transform="rotate(-8 51 127)"/>
+          <!-- cap -->
+          <path d="M128 34 74 58l54 24 54-24-54-24Z" fill="#FFFDFE"/>
+          <path d="M96 70v22c0 8 14 14 32 14s32-6 32-14V70" fill="#DBB5EE"/>
+          <path d="M182 58v30" stroke="#FFFDFE" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="182" cy="94" r="7" fill="#FFFDFE"/>
+          <!-- ring badge -->
+          <circle cx="196" cy="140" r="30" fill="#FFFDFE"/>
+          <circle cx="196" cy="140" r="30" stroke="#DBB5EE" stroke-width="6" fill="none"
+                  stroke-dasharray="130 60" transform="rotate(-90 196 140)"/>
+          <text x="196" y="146" text-anchor="middle" font-family="Fredoka, sans-serif" font-size="17" fill="#4C0585">4.21</text>
+          <!-- confetti -->
+          <circle cx="52" cy="42" r="6" fill="#DBB5EE"/>
+          <circle cx="212" cy="34" r="4" fill="#FFFDFE"/>
+          <circle cx="22" cy="152" r="5" fill="#C79CE4"/>
+          <rect x="222" y="86" width="10" height="10" rx="3" fill="#DBB5EE" transform="rotate(24 227 91)"/>
+        </svg>
+      </div>`
+      + '</section>'
+
+      + '<section class="grid grid-stats">'
+      + stat('', 'people', '#4C0585', 'Students', s.students, s.classes + ' classes \u00b7 7 subjects each')
+      + stat('is-pass', 'tick', '#127A55', 'Passed', s.passed, s.passRate.toFixed(1) + '% of the batch')
+      + stat('is-fail', 'cross', '#C31842', 'Failed', s.failed, 'Any compulsory fail sets GPA 0.00')
+      + stat('', 'flag', '#4C0585', 'Batch GPA', s.batchGpa.toFixed(2), 'Average of passing students')
+      + stat('is-flag', 'warn', '#9A6200', 'On checking lists', flagged,
+        s.lists.overlaps + ' students on two lists')
+      + '</section>'
+
+      + '<section class="grid grid-2-1">'
+      + '<div class="card"><div class="card-head"><div><h2>Results needing a look</h2>'
+      + '<p>Sorted by the students whose result the rules changed.</p></div>'
+      + '<a class="link-more" href="results.html">See all ' + s.students + '</a></div>'
+      + '<div class="table-wrap"><table class="tbl"><thead><tr><th>Student</th><th>Class</th>'
+      + '<th>Average</th><th>Final GPA</th><th>Grade</th><th>Decided by</th></tr></thead>'
+      + '<tbody id="rows"></tbody></table></div></div>'
+
+      + '<div class="grid" style="gap:20px;align-content:start">'
+      + '<div class="card"><div class="card-head"><div><h3>Letter grades</h3>'
+      + '<p>Across both classes.</p></div></div><div class="dist">' + dist + '</div></div>'
+      + '<div class="card"><div class="card-head"><div><h3>Before you publish</h3>'
+      + '<p>Three checks the office runs by hand.</p></div></div><div class="note-list">'
+      + '<div class="note"><b>' + s.lists.optional + ' optional-subject entries</b>'
+      + '<p>Optional grade point is 2.00 or below, so it added nothing to the GPA.</p></div>'
+      + '<div class="note"><b>' + s.lists.practical + ' practical fails</b>'
+      + '<p>Practical mark under 8 while the theory mark passed. Verify the practical sheet.</p></div>'
+      + '<div class="note"><b>' + s.lists.absent + ' absent marks</b>'
+      + '<p>AB recorded in at least one subject. Confirm the attendance register.</p></div>'
+      + '</div></div></div></section>'
+      + scaleStrip();
+
+    return api('/api/results?flagged=1&limit=7');
+  }).then(function (data) {
+    document.getElementById('rows').innerHTML = data.results.map(function (r) {
+      const cls = data.classes.filter(function (c) { return c.id === r.classId; })[0];
+      const decided = r.decidedBy;
+      return '<tr' + (r.passed ? '' : ' class="is-flagged"') + '>'
+        + '<td>' + whoCell(r.name, 'Roll ' + r.roll,
+          'student.html?code=' + encodeURIComponent(r.code)) + '</td>'
+        + '<td>' + esc(cls ? cls.name.replace('Class 10 \u2014 ', '') : '') + '</td>'
+        + '<td class="num">' + gp(r.rawGpa) + '</td>'
+        + '<td class="num"' + (r.passed ? '' : ' style="color:var(--fail);font-weight:700"')
+        + '>' + gp(r.finalGpa) + '</td>'
+        + '<td>' + letterChip(r.letter) + '</td>'
+        + '<td>' + ruleChip(decided.ruleId) + ' ' + esc(decided.text) + '</td></tr>';
+    }).join('');
+
+    const search = document.getElementById('topsearch');
+    if (search) {
+      search.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && search.value.trim()) {
+          window.location.href = 'results.html?q=' + encodeURIComponent(search.value.trim());
+        }
+      });
+    }
+  }).catch(function (err) { fail(view, err.message); });
+}());
+</script>
+</body>
+</html>

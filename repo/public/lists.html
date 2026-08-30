@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checking lists · Result Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/engine.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar"></div>
+    <div id="view"><div class="card"><div class="empty">Loading&hellip;</div></div></div>
+  </main>
+</div>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const user = requireSession(['ops', 'executive']);
+  if (!user) return;
+  const view = document.getElementById('view');
+  renderSidebar('lists.html', 'Three checks the office runs before publishing.');
+  renderTopbar('Search the checking lists');
+
+  let lists = null;
+  let tab = 'optional';
+
+  function alsoOn(code) {
+    const on = [];
+    if (tab !== 'optional' && lists.optionalList.some(function (x) { return x.code === code; })) {
+      on.push('<span class="rule">Optional list</span>');
+    }
+    if (tab !== 'practical' && lists.practicalList.some(function (x) { return x.code === code; })) {
+      on.push('<span class="rule is-fail">Practical list</span>');
+    }
+    if (tab !== 'absent' && lists.absentList.some(function (x) { return x.code === code; })) {
+      on.push('<span class="rule is-absent">Absent list</span>');
+    }
+    return on.length ? on.join(' ') : '\u2014';
+  }
+
+  function link(code, name, roll) {
+    return whoCell(name, roll, 'student.html?code=' + encodeURIComponent(code));
+  }
+
+  function panelOptional() {
+    const rows = lists.optionalList.map(function (r) {
+      const absent = /Absent/.test(r.note);
+      return '<tr>' + '<td>' + link(r.code, r.name, r.code) + '</td>'
+        + '<td>' + esc(className(r.classId)) + '</td>'
+        + '<td>' + esc(r.subject || '\u2014') + '</td>'
+        + '<td>' + (absent ? '<span class="badge badge-absent">AB</span>'
+          : '<span class="num">' + gp(r.optionalGp) + '</span>') + '</td>'
+        + '<td class="num">' + gp(r.optionalGp) + '</td>'
+        + '<td class="num">0.00</td>'
+        + '<td>' + alsoOn(r.code) + '</td></tr>';
+    }).join('');
+    return card('Optional subject rule', 'rule', 'R-29',
+      'Optional grade point is 2.00 or below, so after the \u22122 deduction it added nothing to '
+      + 'the GPA. An absent optional subject counts here too.',
+      'badge-flag', lists.optionalList.length,
+      ['Student', 'Class', 'Optional subject', 'Mark', 'Optional GP', 'Added to GPA', 'Also on'],
+      rows, 7);
+  }
+
+  function panelPractical() {
+    const rows = lists.practicalList.map(function (r) {
+      return '<tr class="is-flagged"><td>' + link(r.code, r.name, r.code) + '</td>'
+        + '<td>' + esc(className(r.classId)) + '</td>'
+        + '<td>' + esc(r.subjects.join(', ')) + '</td>'
+        + '<td>' + esc(r.note.replace('Practical below 8 in ', 'below 8 in ')) + '</td>'
+        + '<td class="num">0.00</td>'
+        + '<td>' + alsoOn(r.code) + '</td></tr>';
+    }).join('');
+    return card('Practical fail', 'rule is-fail', 'R-11',
+      'Practical part below 8 out of 25. The subject grade point is 0.00 even where the theory '
+      + 'mark passed comfortably.',
+      'badge-fail', lists.practicalList.length,
+      ['Student', 'Class', 'Subject', 'Why it is listed', 'Subject GP', 'Also on'], rows, 6);
+  }
+
+  function panelAbsent() {
+    const rows = lists.absentList.map(function (r) {
+      const optionalOnly = lists.optionalList.some(function (x) {
+        return x.code === r.code && r.subjects.indexOf(x.subject) > -1;
+      }) && r.subjects.length === 1;
+      return '<tr' + (optionalOnly ? '' : ' class="is-flagged"') + '>'
+        + '<td>' + link(r.code, r.name, r.code) + '</td>'
+        + '<td>' + esc(className(r.classId)) + '</td>'
+        + '<td>' + esc(r.subjects.join(', ')) + ' <span class="badge badge-absent">AB</span></td>'
+        + '<td>' + (optionalOnly ? 'Optional' : 'Compulsory') + '</td>'
+        + '<td>' + (optionalOnly ? 'Contributes 0.00, result stands'
+          : 'Subject GP 0.00, whole result F') + '</td>'
+        + '<td>' + alsoOn(r.code) + '</td></tr>';
+    }).join('');
+    return card('Absent', 'rule is-absent', 'R-12',
+      'AB recorded in at least one subject. An absent compulsory subject fails the whole result; '
+      + 'an absent optional subject contributes 0.00.',
+      'badge-absent', lists.absentList.length,
+      ['Student', 'Class', 'Subject missed', 'Kind', 'Effect on the result', 'Also on'], rows, 6);
+  }
+
+  function card(title, ruleCls, ruleId, blurb, badgeCls, count, headers, rows, cols) {
+    return '<div class="card"><div class="card-head"><div><h3>' + title
+      + ' <span class="' + ruleCls + '">' + ruleId + '</span></h3><p>' + blurb + '</p></div>'
+      + '<span class="badge ' + badgeCls + '">' + count + ' to verify</span></div>'
+      + '<div class="table-wrap"><table class="tbl"><thead><tr>'
+      + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('')
+      + '</tr></thead><tbody>'
+      + (rows || '<tr><td colspan="' + cols + '" class="empty">No students on this list.</td></tr>')
+      + '</tbody></table></div></div>';
+  }
+
+  let classes = [];
+  function className(id) {
+    const c = classes.filter(function (x) { return x.id === id; })[0];
+    return c ? c.name.replace('Class 10 \u2014 ', '10-') : '';
+  }
+
+  function drawPanel() {
+    document.getElementById('panel').innerHTML =
+      tab === 'optional' ? panelOptional()
+        : tab === 'practical' ? panelPractical() : panelAbsent();
+    Array.prototype.forEach.call(document.querySelectorAll('.tab-bar button'), function (b) {
+      b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    });
+  }
+
+  function draw() {
+    const total = lists.optionalList.length + lists.practicalList.length + lists.absentList.length;
+    const names = lists.overlaps.map(function (o) { return o.name; });
+    view.innerHTML =
+      '<section class="card"><div class="section-title"><div><h2>Checking lists</h2>'
+      + '<p>Every student whose result was changed by the optional subject rule, a practical fail '
+      + 'or an absent mark. Verify these by hand before results go out.</p></div>'
+      + '<div class="tools"><button class="btn btn-quiet" id="csv">Download CSV</button>'
+      + '<button class="btn btn-purple" id="print">Print all three</button></div></div>'
+      + '<div class="overlap" style="margin-top:18px">' + svg('info', { stroke: '#9A6200', w: 1.9 })
+      + ' ' + total + ' entries across the three lists. '
+      + (names.length
+        ? esc(names.join(', ')) + (names.length === 1 ? ' appears' : ' each appear')
+          + ' on more than one \u2014 that is expected under R-29.'
+        : 'No student appears on more than one list.')
+      + '</div></section>'
+
+      + '<section class="tabs"><div class="tab-bar">'
+      + '<button data-tab="optional" aria-selected="true">Optional subject rule '
+      + '<span class="count">' + lists.optionalList.length + '</span></button>'
+      + '<button data-tab="practical" aria-selected="false">Practical fail '
+      + '<span class="count">' + lists.practicalList.length + '</span></button>'
+      + '<button data-tab="absent" aria-selected="false">Absent '
+      + '<span class="count">' + lists.absentList.length + '</span></button>'
+      + '</div><div id="panel"></div></section>';
+
+    Array.prototype.forEach.call(document.querySelectorAll('.tab-bar button'), function (b) {
+      b.addEventListener('click', function () { tab = b.dataset.tab; drawPanel(); });
+    });
+    document.getElementById('print').addEventListener('click', function () { window.print(); });
+    document.getElementById('csv').addEventListener('click', exportCsv);
+    drawPanel();
+  }
+
+  function exportCsv() {
+    const lines = ['list,code,name,class,detail'];
+    const push = function (name, arr) {
+      arr.forEach(function (r) {
+        lines.push([name, r.code, '"' + r.name + '"', '"' + className(r.classId) + '"',
+          '"' + r.note + '"'].join(','));
+      });
+    };
+    push('optional', lists.optionalList);
+    push('practical', lists.practicalList);
+    push('absent', lists.absentList);
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'checking-lists.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  Promise.all([api('/api/checklists'), api('/api/students')]).then(function (out) {
+    lists = out[0];
+    classes = out[1].classes;
+    draw();
+  }).catch(function (err) { fail(view, err.message); });
+}());
+</script>
+</body>
+</html>

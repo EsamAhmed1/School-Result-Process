@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grading rules · Result Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/engine.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar"></div>
+    <div id="view"></div>
+  </main>
+</div>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const user = requireSession(null);
+  if (!user) return;
+  renderSidebar('rules.html', 'One policy file drives every calculation.');
+  renderTopbar('Search the rules');
+
+  const rules = [
+    ['R-10', 'rule', 'Letter grade from the final GPA',
+      'The grade point for a subject comes from the combined mark out of 100: 80+ gives 5.00, '
+      + '70\u201379 gives 4.00, 60\u201369 gives 3.50, 50\u201359 gives 3.00, 40\u201349 gives '
+      + '2.00, 33\u201339 gives 1.00, below 33 gives 0.00. The letter comes from the final GPA.'],
+    ['R-11', 'rule is-fail', 'Theory and practical',
+      'Theory is out of 75 with a pass mark of 25; practical is out of 25 with a pass mark of 8. '
+      + 'Failing either part fails the whole subject and the grade point is 0.00, however good '
+      + 'the other part is. A theory-only subject is marked out of 100 with a pass mark of 33.'],
+    ['R-12', 'rule is-absent', 'Absent',
+      'AB in a compulsory subject gives grade point 0.00 and fails the whole result. AB in the '
+      + 'optional subject contributes 0.00 but does not fail the student. Either way the student '
+      + 'appears on the absent checking list. Absence is checked before low marks, so an absent '
+      + 'row always reports R-12.'],
+    ['R-13', 'rule', 'The GPA formula',
+      'GPA = (sum of the six compulsory grade points + max(0, optional grade point \u2212 2)) '
+      + '\u00f7 6, capped at 5.00 and shown to two decimal places. Any compulsory failure sets '
+      + 'the final GPA to 0.00 and the letter to F, while the uncancelled average stays visible '
+      + 'in the trace.'],
+    ['R-29', 'rule', 'Checking lists',
+      'The optional list holds every student whose optional grade point is 2.00 or below, an '
+      + 'absent optional included. The practical list holds every student with a practical part '
+      + 'below 8 in any subject. The absent list holds every student with AB in any subject. '
+      + 'A student can appear on more than one list.'],
+  ];
+
+  document.getElementById('view').innerHTML =
+    '<section class="card"><div class="section-title"><div><h2>Grading rules</h2>'
+    + '<p>The published rules this engine applies. Every threshold below lives in one '
+    + 'configuration file, so changing the scheme is a one-file edit.</p></div></div></section>'
+    + '<section class="grid grid-halves">'
+    + rules.map(function (r) {
+      return '<div class="card"><div class="card-head"><div>'
+        + '<h3><span class="' + r[1] + '">' + r[0] + '</span> ' + esc(r[2]) + '</h3></div></div>'
+        + '<p style="margin:0;font-size:13.5px;color:var(--muted)">' + r[3] + '</p></div>';
+    }).join('')
+    + '</section>' + scaleStrip();
+}());
+</script>
+</body>
+</html>

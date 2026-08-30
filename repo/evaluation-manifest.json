@@ -1,0 +1,91 @@
+{
+  "team_id": "LSH26-T013",
+  "problem_id": "P08",
+  "repository_name": "lsh26-t013-p08",
+  "live_url": "https://example.com",
+  "demo_video_url_optional": "",
+  "event_start_code": "LSH26-8490-C900",
+  "repository_created_before_release": false,
+  "pre_event_materials": [],
+  "sample_data": {
+    "loads_published_fixture": true,
+    "method": "bundled fixture",
+    "reset_instructions": "The dataset is generated deterministically from lib/seed.js and loads automatically on every page. To restore the initial data, open the dashboard and press 'Restore sample data', which calls GET /api/reset and rebuilds the fixture. No upload or configuration is needed."
+  },
+  "problem_solving_method": "The grading rules were built first as a standalone engine with a single configuration file holding every pass mark, grade-point band and letter boundary. Eleven hard-edge students were written by hand and asserted in a dependency-free test harness before any interface existed, so the calculation was proven correct independently of the UI. The interface is then a thin reader over that engine: no page computes a grade point, and every rule decision carries its rule ID from the engine into the trace, so the displayed explanation can never drift from the arithmetic.",
+  "requirements": {
+    "R1": {
+      "status": "complete",
+      "evidence": "/results.html and lib/seed.js \u2014 62 students across 2 classes, six compulsory plus one optional subject each, 11 hard-edge cases filterable in the results table, with the subject table below it"
+    },
+    "R2": {
+      "status": "complete",
+      "evidence": "/results.html and lib/engine.js \u2014 per-subject grade points, uncancelled average, final GPA, letter grade and the deciding rule for every student"
+    },
+    "R3": {
+      "status": "complete",
+      "evidence": "/student.html \u2014 per subject the mark used, grade point, result and deciding rule (R-10/R-11/R-12), plus the twin-arc GPA ring, the step-by-step calculation and the compulsory subject that caused any failure"
+    },
+    "R4": {
+      "status": "complete",
+      "evidence": "/lists.html and buildChecklists in lib/engine.js \u2014 three tabbed lists (optional rule, practical fail, absent) with cross-references showing which students appear on more than one"
+    }
+  },
+  "team_members": [
+    {
+      "registered_name": "Esam Ahmed",
+      "github_username": "EsamAhmed1",
+      "major_contribution": "",
+      "evidence_paths_or_commits": [
+        "lib/engine.js",
+        "lib/grading.js",
+        "test/engine.test.js"
+      ]
+    },
+    {
+      "registered_name": "S.R.M Tanzil Ahmed",
+      "github_username": "SRM-Tanzil-Ahmed",
+      "major_contribution": "",
+      "evidence_paths_or_commits": [
+        "public/assets/css/app.css",
+        "public/results.html",
+        "public/trace.html"
+      ]
+    },
+    {
+      "registered_name": "Shaishab Saha",
+      "github_username": "ShaishabSaha",
+      "major_contribution": "",
+      "evidence_paths_or_commits": [
+        "lib/seed.js",
+        "api/checklists.js",
+        "public/checklists.html"
+      ]
+    }
+  ],
+  "major_design_decisions": [
+    "Node serverless functions instead of PHP and MySQL, because Vercel has no PHP runtime; the frontend remains plain HTML, CSS and vanilla JavaScript with no framework",
+    "No GPA or grade point is ever stored \u2014 every read runs the engine, so results and traces cannot disagree and revised marks need no cascade",
+    "All thresholds live in one configuration file, lib/grading.js; no other file contains a pass mark, band or letter boundary",
+    "The engine returns the rule ID and rule sentence with each subject result, so the trace displays what was actually decided rather than re-deriving it",
+    "Teachers are scoped to their assigned subjects for anything they would edit, but have read-only access to all results and traces, as requested for this deployment",
+    "Absence is evaluated before low marks, so an absent student who would also have failed on marks reports R-12 rather than R-11",
+    "The mark to grade-point table is not given in the problem statement; the standard 80/70/60/50/40/33 bands are used, consistent with the stated 25 + 8 = 33 pass total, and are configurable in one place",
+    "Theory-only subjects are marked out of 100 with a pass mark of 33, so they are not capped at grade point 4.00"
+  ],
+  "known_limitations": [
+    "Data is held in memory per serverless instance; reads are consistent because the fixture is deterministic, but writes would not persist across instances",
+    "Role-based panels for operations, teacher, student/guardian and executive are specified in docs/PLAN.md but not implemented in this commit",
+    "Mark entry, result publication, the rechecking challenge workflow, the audit log and notifications are not implemented in this commit",
+    "PDF export is not implemented; CSV export is available on the results and checking-list pages"
+  ],
+  "ai_tools_used": [
+    {
+      "tool": "Claude",
+      "used_for": "Architecture planning, the grading engine, seed data, API routes and frontend pages",
+      "how_output_was_verified": "A dependency-free assertion harness (test/engine.test.js, 52 assertions) checks every rule path and all eleven hard-edge cases, including the boundary values 25+8, optional grade point exactly 2.00, the 5.00 cap and the exact 3.50 letter boundary. Expected GPAs were computed by hand from the rules in the problem statement and compared against engine output; two seeded students were corrected when the values did not match. Every API route and page was smoke-tested locally before deployment."
+    }
+  ],
+  "licenses_file": "LICENSES.md",
+  "declaration": "The information above is complete and truthful to the best of the team's knowledge."
+}

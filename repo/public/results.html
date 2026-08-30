@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All results · Result Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/engine.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar"></div>
+    <div id="view"><div class="card"><div class="empty">Loading&hellip;</div></div></div>
+  </main>
+</div>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const user = requireSession(['ops', 'executive', 'teacher']);
+  if (!user) return;
+  const view = document.getElementById('view');
+  renderSidebar('results.html', 'Grade points, GPA and letter grade for every student.');
+  renderTopbar('Search a student or roll');
+
+  let all = [];
+  let classes = [];
+  let subjects = [];
+  const params = new URLSearchParams(window.location.search);
+
+  function className(id) {
+    const c = classes.filter(function (x) { return x.id === id; })[0];
+    return c ? c.name : '';
+  }
+
+  function visible() {
+    const q = document.getElementById('f-q').value.toLowerCase();
+    const cid = document.getElementById('f-class').value;
+    const st = document.getElementById('f-status').value;
+    const edge = document.getElementById('f-edge').value;
+    return all.filter(function (r) {
+      if (cid && String(r.classId) !== cid) return false;
+      if (st === 'pass' && !r.passed) return false;
+      if (st === 'fail' && r.passed) return false;
+      if (st === 'flagged' && !r.flagged) return false;
+      if (edge === '1' && !r.isEdgeCase) return false;
+      if (!q) return true;
+      return r.name.toLowerCase().indexOf(q) > -1 || r.code.toLowerCase().indexOf(q) > -1
+        || String(r.roll) === q;
+    });
+  }
+
+  function drawRows() {
+    const list = visible();
+    document.getElementById('count').textContent =
+      list.length + ' of ' + all.length + ' students';
+    document.getElementById('rows').innerHTML = list.length
+      ? list.map(function (r) {
+        return '<tr' + (r.passed ? '' : ' class="is-flagged"') + '>'
+          + '<td>' + whoCell(r.name, 'Roll ' + r.roll + ' \u00b7 ' + r.code,
+            'student.html?code=' + encodeURIComponent(r.code)) + '</td>'
+          + '<td>' + esc(className(r.classId).replace('Class 10 \u2014 ', '10-')) + '</td>'
+          + '<td class="num">' + r.subjects.filter(function (s) { return !s.isOptional; })
+            .map(function (s) {
+              return s.gp === 0 ? '<span style="color:var(--fail)">0.00</span>' : gp(s.gp);
+            }).join(' \u00b7 ') + '</td>'
+          + '<td class="num">' + gp(r.rawGpa) + '</td>'
+          + '<td class="num"' + (r.passed ? '' : ' style="color:var(--fail);font-weight:700"')
+          + '>' + gp(r.finalGpa) + '</td>'
+          + '<td>' + letterChip(r.letter) + '</td>'
+          + '<td>' + ruleChip(r.decidedBy.ruleId) + ' ' + esc(r.decidedBy.text) + '</td></tr>';
+      }).join('')
+      : '<tr><td colspan="7" class="empty">No students match that filter.</td></tr>';
+  }
+
+  function exportCsv() {
+    const list = visible();
+    const lines = ['code,name,class,roll,uncancelled_gpa,final_gpa,letter,outcome,decided_by'];
+    list.forEach(function (r) {
+      lines.push([r.code, '"' + r.name + '"', '"' + className(r.classId) + '"', r.roll,
+        gp(r.rawGpa), gp(r.finalGpa), r.letter, r.passed ? 'pass' : 'fail',
+        '"' + r.decidedBy.ruleId + ' ' + r.decidedBy.text + '"'].join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'results.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  Promise.all([api('/api/results'), api('/api/students')]).then(function (out) {
+    classes = out[1].classes;
+    subjects = out[1].subjects;
+    const roster = out[1].students;
+    all = out[0].results.map(function (r) {
+      const s = roster.filter(function (x) { return x.code === r.code; })[0] || {};
+      return Object.assign({}, r, { isEdgeCase: !!s.isEdgeCase });
+    });
+
+    const classOptions = '<option value="">All classes</option>' + classes.map(function (c) {
+      return '<option value="' + c.id + '"'
+        + (params.get('classId') === String(c.id) ? ' selected' : '') + '>'
+        + esc(c.name) + '</option>';
+    }).join('');
+
+    const subjectRows = subjects.map(function (s) {
+      return '<tr><td>' + esc(className(s.classId).replace('Class 10 \u2014 ', '10-')) + '</td>'
+        + '<td>' + esc(s.name) + '</td>'
+        + '<td>' + (s.isOptional ? '<span class="badge badge-flag">Optional</span>'
+          : '<span class="badge badge-plain">Compulsory</span>') + '</td>'
+        + '<td>' + (s.hasPractical ? 'Theory 75 pass 25 \u00b7 practical 25 pass 8'
+          : 'Theory 100 pass 33') + '</td></tr>';
+    }).join('');
+
+    view.innerHTML =
+      '<section class="card"><div class="section-title"><div><h2>All results</h2>'
+      + '<p id="count"></p></div>'
+      + '<div class="tools"><button class="btn btn-quiet" id="csv">Download CSV</button>'
+      + '<a class="btn btn-purple" href="lists.html">Checking lists</a></div></div>'
+      + '<div class="filters" style="margin-top:18px">'
+      + '<input type="search" id="f-q" placeholder="Search name, code or roll" '
+      + 'value="' + esc(params.get('q') || '') + '">'
+      + '<select id="f-class">' + classOptions + '</select>'
+      + '<select id="f-status"><option value="">All outcomes</option>'
+      + '<option value="pass">Passed</option><option value="fail">Failed</option>'
+      + '<option value="flagged">On a checking list</option></select>'
+      + '<select id="f-edge"><option value="">All students</option>'
+      + '<option value="1">Hard-edge cases only</option></select></div>'
+      + '<div class="table-wrap"><table class="tbl"><thead><tr><th>Student</th><th>Class</th>'
+      + '<th>Compulsory grade points</th><th>Average</th><th>Final GPA</th><th>Grade</th>'
+      + '<th>Decided by</th></tr></thead><tbody id="rows"></tbody></table></div></section>'
+
+      + '<section class="card"><div class="card-head"><div><h3>Subjects</h3>'
+      + '<p>Six compulsory subjects and one optional subject per student.</p></div>'
+      + '<span class="badge badge-plain">' + subjects.length + ' across '
+      + classes.length + ' classes</span></div>'
+      + '<div class="table-wrap"><table class="tbl"><thead><tr><th>Class</th><th>Subject</th>'
+      + '<th>Type</th><th>Components</th></tr></thead><tbody>' + subjectRows
+      + '</tbody></table></div></section>'
+      + scaleStrip();
+
+    ['f-q', 'f-class', 'f-status', 'f-edge'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', drawRows);
+    });
+    document.getElementById('csv').addEventListener('click', exportCsv);
+
+    const top = document.getElementById('topsearch');
+    if (top) {
+      top.addEventListener('input', function () {
+        document.getElementById('f-q').value = top.value;
+        drawRows();
+      });
+    }
+    drawRows();
+  }).catch(function (err) { fail(view, err.message); });
+}());
+</script>
+</body>
+</html>

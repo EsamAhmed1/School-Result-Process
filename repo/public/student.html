@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student result · Result Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/engine.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar"></div>
+    <div id="view"><div class="card"><div class="empty">Loading&hellip;</div></div></div>
+  </main>
+</div>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  const user = requireSession(null);
+  if (!user) return;
+  const view = document.getElementById('view');
+  const isOwn = user.role === 'student' || user.role === 'guardian';
+  renderSidebar('student.html', 'Every grade point carries the rule that produced it.');
+  renderTopbar('Search a student, roll or subject');
+
+  const RING = { outer: 82, inner: 66 };
+  const circ = function (r) { return 2 * Math.PI * r; };
+
+  /** Twin arcs: ghost shows the uncancelled average, solid shows the final GPA. */
+  function ring(rawGpa, finalGpa, failed) {
+    const co = circ(RING.outer);
+    const ci = circ(RING.inner);
+    const ghost = (Math.min(rawGpa, 5) / 5) * co;
+    const solid = (Math.min(finalGpa, 5) / 5) * ci;
+    const solidColour = failed ? '#F2426B' : '#4C0585';
+    const innerTrack = failed ? '#FEE7ED' : '#F3E9FA';
+    return '<div class="ring"><svg viewBox="0 0 186 186" role="img" aria-label="Final GPA '
+      + gp(finalGpa) + ' with an uncancelled average of ' + gp(rawGpa) + '">'
+      + '<circle cx="93" cy="93" r="82" fill="none" stroke="#F3E9FA" stroke-width="10"/>'
+      + '<circle cx="93" cy="93" r="82" fill="none" stroke="#DBB5EE" stroke-width="10"'
+      + ' stroke-linecap="round" stroke-dasharray="' + ghost.toFixed(1) + ' '
+      + (co - ghost).toFixed(1) + '"/>'
+      + '<circle cx="93" cy="93" r="66" fill="none" stroke="' + innerTrack + '" stroke-width="12"/>'
+      + '<circle cx="93" cy="93" r="66" fill="none" stroke="' + solidColour + '" stroke-width="12"'
+      + ' stroke-linecap="round" stroke-dasharray="' + Math.max(solid, 1).toFixed(1) + ' '
+      + (ci - solid).toFixed(1) + '"/>'
+      + '</svg><div class="ring-core">'
+      + '<div class="val' + (failed ? '' : ' is-pass') + '">' + gp(finalGpa) + '</div>'
+      + '<div class="cap">Grade ' + esc(t2letter) + '</div></div></div>';
+  }
+
+  let t2letter = '';
+
+  function traceRow(r) {
+    const cls = r.status === 'absent' ? ' is-absent'
+      : r.status === 'fail' ? ' is-fail' : r.isOptional ? ' is-optional' : '';
+    const kind = (r.isOptional ? 'Optional' : 'Compulsory')
+      + ' · ' + (r.hasPractical ? 'theory + practical' : 'theory only');
+
+    let pills;
+    if (r.status === 'absent') {
+      pills = '<span class="pill bad"><em>Marked</em> AB</span>';
+    } else {
+      pills = '<span class="pill' + (r.theory < (r.hasPractical ? 25 : 33) ? ' bad' : '')
+        + '"><em>Theory</em> ' + r.theory + '/' + r.theoryMax + '</span>';
+      if (r.hasPractical) {
+        pills += '<span class="pill' + (r.practical < 8 ? ' bad' : '') + '"><em>Practical</em> '
+          + r.practical + '/' + r.practicalMax + '</span>';
+      }
+      pills += '<span class="pill"><em>Total</em> ' + r.total + '</span>';
+    }
+
+    return '<div class="trace-row' + cls + '">'
+      + '<div class="trace-sub"><b>' + esc(r.subject) + '</b><span>' + kind + '</span></div>'
+      + '<div class="trace-marks">' + pills + '</div>'
+      + '<div class="trace-gp' + (r.gp === 0 ? ' zero' : '') + '">' + gp(r.gp) + '</div>'
+      + '<div class="trace-why">' + ruleChip(r.ruleId) + '<br>' + esc(r.ruleText) + '</div>'
+      + '</div>';
+  }
+
+  function draw(d) {
+    const t = d.trace;
+    const failed = t.overrideApplied;
+    t2letter = t.letter;
+
+    const compulsory = t.rows.filter(function (r) { return !r.isOptional; });
+    const steps =
+      '<div>compulsory = ' + compulsory.map(function (r) {
+        return r.gp === 0 ? '<span style="color:var(--fail)">0.00</span>' : gp(r.gp);
+      }).join(' + ') + ' = ' + gp(t.compulsorySum) + '</div>'
+      + '<div>optional&nbsp;&nbsp; = max(0, ' + gp(t.optionalGp) + ' \u2212 2.00) = '
+      + gp(t.optionalContribution) + '</div>'
+      + '<div>average&nbsp;&nbsp;&nbsp;= (' + gp(t.compulsorySum) + ' + '
+      + gp(t.optionalContribution) + ') \u00f7 6 = ' + gp(t.rawGpa) + '</div>'
+      + '<div>cap&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= min(' + gp(t.rawGpa)
+      + ', 5.00) = ' + gp(Math.min(t.rawGpa, 5)) + ' <span class="rule">R-13</span></div>'
+      + (failed
+        ? '<div style="color:var(--fail)">compulsory fail in '
+          + esc(t.failedCompulsory.map(function (f) { return f.subject; }).join(', '))
+          + ' \u2192 final GPA 0.00, grade F <span class="rule is-fail">R-13</span> '
+          + '<span class="rule is-fail">R-10</span></div>'
+        : '<div>final&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= ' + gp(t.finalGpa) + ', grade ' + t.letter
+          + ' <span class="rule">R-10</span></div>');
+
+    const callout = failed
+      ? '<div class="callout"><span class="mark">'
+        + svg('warn', { stroke: '#C31842', w: 2 }) + '</span><div>'
+        + '<b>' + esc(t.failedCompulsory[0].subject) + ' is why this result is an F</b>'
+        + '<p>Six of seven subjects were graded and the average across them is ' + gp(t.rawGpa)
+        + ', but a compulsory subject failed, so R-13 sets the final GPA to 0.00 and R-10 '
+        + 'returns F. The average stays on the sheet for the teacher to see.</p></div></div>'
+      : '';
+
+    // which checking lists this student lands on
+    const notes = [];
+    if (t.flags.practicalList) {
+      notes.push('<div class="note" style="background:var(--fail-soft)"><b>Practical fail list</b>'
+        + '<p>Practical below the pass mark of 8 in '
+        + esc(t.flags.practicalFails.join(', ')) + '.</p></div>');
+    }
+    if (t.flags.absentList) {
+      notes.push('<div class="note" style="background:var(--absent-soft)"><b>Absent list</b>'
+        + '<p>Marked AB in ' + esc(t.flags.absentSubjects.join(', ')) + '.</p></div>');
+    }
+    if (t.flags.optionalList) {
+      notes.push('<div class="note" style="background:var(--flag-soft)"><b>Optional subject list</b>'
+        + '<p>' + esc(t.optionalSubject) + ' scored ' + gp(t.optionalGp)
+        + ', so after the \u22122 deduction it added nothing.</p></div>');
+    }
+    const clean = notes.length ? '' : '<div class="overlap" style="margin-top:12px">'
+      + svg('info', { stroke: '#9A6200', w: 1.9 })
+      + ' Not on any checking list \u2014 no rule changed this result.</div>';
+
+    view.innerHTML =
+      '<section class="card"><div class="profile">'
+      + '<div class="profile-photo">' + esc(initials(t.name)) + '</div>'
+      + '<div style="flex:1;min-width:220px"><h2>' + esc(t.name) + '</h2>'
+      + '<div class="sub">Roll ' + t.roll + ' \u00b7 ' + esc(t.code)
+      + ' \u00b7 Half yearly examination 2026</div>'
+      + '<div class="facts">'
+      + '<div class="fact"><div class="k">Class</div><div class="v">'
+      + esc(d.className || t.className) + '</div></div>'
+      + '<div class="fact"><div class="k">Optional subject</div><div class="v">'
+      + esc(t.optionalSubject || '\u2014') + '</div></div>'
+      + '<div class="fact"><div class="k">Uncancelled average</div><div class="v mono">'
+      + gp(t.rawGpa) + '</div></div>'
+      + '<div class="fact"><div class="k">Result status</div><div class="v">'
+      + statusBadge(failed ? 'fail' : 'pass') + '</div></div>'
+      + '</div></div>'
+      + '<div class="tools">'
+      + '<button class="btn btn-quiet" id="print">Print sheet</button>'
+      + (isOwn ? '' : '<button class="btn btn-purple" id="csv">Download sheet</button>')
+      + '</div></div></section>'
+
+      + '<section class="grid grid-1-2">'
+      + '<div class="grid" style="gap:20px;align-content:start">'
+      + '<div class="ring-card"><div class="card-head" style="width:100%;margin-bottom:0">'
+      + '<div><h3>Final GPA</h3><p>Rule R-13 \u00b7 shown to 2 decimal places</p></div></div>'
+      + ring(t.rawGpa, t.finalGpa, failed)
+      + '<div class="ring-key">'
+      + '<div class="key-row"><span class="key-dot solid" style="background:'
+      + (failed ? 'var(--fail)' : 'var(--purple)') + '"></span> Final GPA'
+      + (failed ? ' after cancellation' : '') + ' <b>' + gp(t.finalGpa) + '</b></div>'
+      + '<div class="key-row"><span class="key-dot ghost"></span> Uncancelled average <b>'
+      + gp(t.rawGpa) + '</b></div></div></div>'
+
+      + '<div class="card"><div class="card-head"><div><h3>On the checking lists</h3>'
+      + '<p>Where this result appears for the office.</p></div></div>'
+      + '<div class="note-list">' + notes.join('') + '</div>' + clean + '</div></div>'
+
+      + '<div class="card"><div class="card-head"><div>'
+      + '<h2>How each subject was decided</h2>'
+      + '<p>The mark used, the grade point it produced, and the rule that decided it.</p></div>'
+      + '<span class="badge badge-plain">' + t.rows.length + ' subjects</span></div>'
+      + '<div class="trace">' + t.rows.map(traceRow).join('') + '</div>'
+      + callout
+      + '<div style="margin-top:18px;background:var(--mist);border-radius:20px;padding:18px 20px">'
+      + '<div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;'
+      + 'color:var(--muted);margin-bottom:10px">The calculation, step by step</div>'
+      + '<div class="mono" style="font-size:12.5px;line-height:2;color:var(--ink)">'
+      + steps + '</div></div></div></section>'
+
+      + '<section class="grid grid-halves">'
+      + '<div class="card"><div class="card-head"><div><h3>Pass marks '
+      + '<span class="rule">R-11</span></h3>'
+      + '<p>Fail either part and the subject grade point is 0.00.</p></div></div>'
+      + '<div class="table-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>Part</th>'
+      + '<th>Out of</th><th>Pass mark</th><th>If it fails</th></tr></thead><tbody>'
+      + '<tr><td>Theory</td><td class="num">75</td><td class="num">25</td>'
+      + '<td>Subject grade point 0.00</td></tr>'
+      + '<tr><td>Practical</td><td class="num">25</td><td class="num">8</td>'
+      + '<td>Subject grade point 0.00</td></tr>'
+      + '<tr><td>Absent (AB)</td><td class="num">\u2014</td><td class="num">\u2014</td>'
+      + '<td>0.00, and the student is listed <span class="rule is-absent">R-12</span></td></tr>'
+      + '</tbody></table></div></div>'
+
+      + '<div class="card"><div class="card-head"><div><h3>Subject grade points '
+      + '<span class="rule">R-10</span></h3>'
+      + '<p>Taken from the combined mark out of 100.</p></div></div><div class="dist">'
+      + [['5.00', '80+', 100], ['4.00', '70\u201379', 86], ['3.50', '60\u201369', 72],
+        ['3.00', '50\u201359', 58], ['2.00', '40\u201349', 44], ['1.00', '33\u201339', 30]]
+        .map(function (b) {
+          return '<div class="dist-row"><span class="lg">' + b[0] + '</span>'
+            + '<span class="bar"><i style="width:' + b[2] + '%"></i></span>'
+            + '<span class="n">' + b[1] + '</span></div>';
+        }).join('')
+      + '<div class="dist-row"><span class="lg" style="color:var(--fail)">0.00</span>'
+      + '<span class="bar is-fail"><i style="width:16%"></i></span>'
+      + '<span class="n">under 33</span></div>'
+      + '</div></div></section>'
+      + scaleStrip();
+
+    document.getElementById('print').addEventListener('click', function () { window.print(); });
+    const csv = document.getElementById('csv');
+    if (csv) csv.addEventListener('click', function () { downloadSheet(t); });
+  }
+
+  function downloadSheet(t) {
+    const lines = ['subject,theory,practical,total,grade_point,result,rule,reason'];
+    t.rows.forEach(function (r) {
+      lines.push([esc(r.subject), r.display === 'AB' ? 'AB' : r.theory,
+        r.hasPractical ? (r.display === 'AB' ? 'AB' : r.practical) : '',
+        r.total === null ? '' : r.total, gp(r.gp), r.status, r.ruleId,
+        '"' + r.ruleText + '"'].join(','));
+    });
+    lines.push('');
+    lines.push('uncancelled_gpa,' + gp(t.rawGpa));
+    lines.push('final_gpa,' + gp(t.finalGpa));
+    lines.push('letter,' + t.letter);
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = t.code + '-result.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function pickerFor(list, current) {
+    const bar = document.querySelector('.topbar');
+    const sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Choose a student');
+    sel.style.cssText = 'font:inherit;font-size:13.5px;padding:11px 15px;border-radius:14px;'
+      + 'border:1px solid rgba(76,5,133,.1);background:var(--paper);box-shadow:var(--shadow);'
+      + 'max-width:280px';
+    sel.innerHTML = list.map(function (s) {
+      return '<option value="' + s.code + '"' + (s.code === current ? ' selected' : '') + '>'
+        + esc(s.code + ' \u2014 ' + s.name) + (s.isEdgeCase ? '  (hard edge)' : '') + '</option>';
+    }).join('');
+    sel.addEventListener('change', function () { load(sel.value); });
+    bar.insertBefore(sel, bar.querySelector('.icon-btn'));
+  }
+
+  let pickerReady = false;
+
+  function load(code) {
+    view.innerHTML = '<div class="card"><div class="empty">Loading&hellip;</div></div>';
+    const url = isOwn
+      ? '/api/myresult' + (code ? '?code=' + encodeURIComponent(code) : '')
+      : '/api/trace?code=' + encodeURIComponent(code);
+
+    api(url).then(function (data) {
+      if (isOwn) {
+        if (!data.published) {
+          view.innerHTML = '<div class="card"><div class="empty">Results are not published yet. '
+            + 'Your result appears here once the exam office publishes it.</div></div>';
+          return;
+        }
+        if (!pickerReady && data.children && data.children.length > 1) {
+          pickerReady = true;
+          pickerFor(data.children, data.trace.code);
+        }
+        draw(data);
+      } else {
+        draw({ trace: data, className: data.className });
+        history.replaceState(null, '', 'student.html?code=' + encodeURIComponent(code));
+      }
+    }).catch(function (err) { fail(view, err.message); });
+  }
+
+  const wanted = new URLSearchParams(window.location.search).get('code');
+
+  if (isOwn) {
+    load(wanted);
+  } else {
+    api('/api/trace').then(function (d) {
+      const start = wanted || d.students[0].code;
+      pickerReady = true;
+      pickerFor(d.students, start);
+      load(start);
+    }).catch(function (err) { fail(view, err.message); });
+  }
+}());
+</script>
+</body>
+</html>
